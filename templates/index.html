@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Meta Information -->
+    <meta charset="UTF-8">
+    <title>Foundry Portal</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" href="{{ url_for('static', filename='images/foundry-portal-icon-512.png') }}" type="image/png">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Signika:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- Main CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    
+    <!-- Main JavaScript with shared_data_mode -->
+    <script id="main-script" data-shared-data-mode="{{ 'true' if shared_data_mode else 'false' }}" src="{{ url_for('static', filename='js/main.js') }}"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>Foundry Portal</h1>
+        </header>
+        
+        <!-- Navigation Menu -->
+        <nav id="menu">
+            <button type="button" onclick="location.href='https://foundryvtt.com';">
+                <img class="fa-fake" src="/static/images/foundry-fa-fake.png" alt="Foundry VTT">
+            </button>
+            <button type="button" onclick="location.href='https://github.com/daxiongmao87/foundry-portal';">
+                <img class="fa-fake" src="/static/images/github-fa-fake.png" alt="GitHub Repository">
+            </button>
+        </nav>
+        
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Active Worlds Section -->
+            <section class="panel" id="active-worlds">
+                <h2>Active Worlds</h2>
+                <div class="worlds-gallery" id="worlds-gallery">
+                    <!-- Dynamic world cards injected here -->
+                </div>
+            </section>
+            
+            <!-- Instance Status Section -->
+            <section class="panel" id="instance-status">
+                <h2>Instances</h2>
+                <div class="status-key">
+                    <div class="status-container"><span class="status-indicator active"></span>Active</div>
+                    <div class="status-container"><span class="status-indicator online"></span>Online</div>
+                    <div class="status-container"><span class="status-indicator offline"></span>Offline</div>
+                </div>
+                <div class="instance-list" id="instance-list">
+                    <!-- Dynamic instance cards injected here -->
+                </div>
+            </section>
+        </main>
+        
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Created by <a href="https://www.github.com/Daxiongmao87">Daxiongmao87</a></p>
+            <p>Foundry Portal is not affiliated with Foundry Gaming LLC</p>
+        </footer>
+    </div>
+</body>
+</html>

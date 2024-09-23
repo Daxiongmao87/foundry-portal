@@ -1,0 +1,59 @@
+# config.template.yaml
+
+# =============================================================================
+# Configuration Template for Foundry Portal Application
+# =============================================================================
+#
+# This template file defines the configuration settings for the Foundry Portal
+# application. Users should copy this file to `config.yaml` and customize the
+# settings as needed for their specific environment.
+#
+# Note:
+# Any changes to the configuration file require a restart of the application to
+# take effect.
+#
+# -----------------------------------------------------------------------------
+
+# shared_data_mode: Determines whether all Foundry instances share the same data folder.
+# 
+# Description:
+# When `shared_data_mode` is set to `true`, the application expects all configured
+# Foundry instances to access a common data directory. This setup makes the worlds
+# instance-agnostic, meaning any active world can be accessed from any available
+# instance. Enabling this mode also activates the "Activate World" button on the
+# frontend, allowing users to seamlessly switch between instances hosting the same
+# world data.
+#
+# Usage:
+# - Set to `true` if your Foundry instances are configured to share the same data folder.
+# - Set to `false` if each Foundry instance maintains its own independent data.
+#
+# Example:
+# shared_data_mode: true
+shared_data_mode: false
+
+# instances: A list of Foundry instance configurations.
+#
+# Description:
+# This section defines each Foundry instance that the portal will manage. Each
+# instance requires a unique `name` and the corresponding `url` where the instance
+# is accessible. The portal periodically checks the status of each instance and
+# updates the frontend accordingly.
+#
+# Fields:
+# - name: A descriptive name for the Foundry instance. This name is displayed in
+#         the portal's interface and should be unique for each instance.
+# - url:  The full URL where the Foundry instance is hosted. Ensure that the URL
+#         is correct and accessible from the server running the portal application.
+#
+# Example:
+# instances:
+#   - name: "Foundry Alpha"
+#     url: "https://alpha.example.com/foundry"
+#   - name: "Foundry Beta"
+#     url: "https://beta.example.com/foundry"
+instances:
+  - name: "Foundry 1"  # A descriptive name for the first Foundry instance
+    url: "https://url.to/your/foundry/instance/1"  # The URL where Foundry instance 1 is accessible
+  - name: "Foundry 2"  # A descriptive name for the second Foundry instance
+    url: "https://url.to/your/foundry/instance/2"  # The URL where Foundry instance 2 is accessible
