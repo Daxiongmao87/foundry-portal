@@ -19,9 +19,9 @@
 # Description:
 # When `shared_data_mode` is set to `true`, the application expects all configured
 # Foundry instances to access a common data directory. This setup makes the worlds
-# instance-agnostic, meaning any active world can be accessed from any available
-# instance. Enabling this mode also activates the "Activate World" button on the
-# frontend, allowing users to seamlessly switch between instances hosting the same
+# instance-agnostic, meaning any world can be activated from any available instance 
+# using the "Activate World" button on the frontend, allowing administrators to
+# seamlessly switch between instances hosting the same
 # world data.
 #
 # Usage:
