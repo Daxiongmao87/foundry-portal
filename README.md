@@ -53,6 +53,30 @@ Before setting up Foundry Portal, ensure you have the following installed on you
 
    **Note**: If you encounter issues with `selenium`, ensure that the ChromeDriver version matches your installed Chrome browser version.
 
+## Running With Docker
+1. **Clone the Repository**
+
+   ```bash
+   git clone https://github.com/daxiongmao87/foundry-portal.git
+   cd foundry-portal
+   ```
+
+2. **Build the image**
+
+   ```
+   docker build -t foundry-portal .
+   ```
+
+3. **Start a Docker container**
+
+   ```
+   docker run -d -p 5000:5000 \
+   -v /path/to/your/config.yaml:/app/config.yaml \
+   --name foundry_portal_container foundry-portal
+   ```
+   Ensuring that you replace "/path/to/your/config.yaml" with a path on your host to a config file. You can use config.template.yaml from this repo as a starting point.
+
+
 ## Configuration
 
 1. **Copy the Configuration Template**
