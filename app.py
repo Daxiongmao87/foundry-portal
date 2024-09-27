@@ -201,4 +201,4 @@ if __name__ == '__main__':
     initialize_instance_data()
     update_instance_statuses()
     # Run the Flask development server with debug mode enabled
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000)
