@@ -99,7 +99,7 @@ def check_instance_status(instance_url):
     except json.JSONDecodeError:
         return "offline", None, None
 
-    if not isinstance(data, dict):
+    if not isinstance(data, dict) or not isinstance(data.get('active'), bool):
         return "offline", None, None
 
     background_url = None

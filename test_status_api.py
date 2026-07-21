@@ -120,6 +120,27 @@ class CheckInstanceStatusTests(unittest.TestCase):
                         ("offline", None, None),
                     )
 
+    def test_error_object_is_offline_but_inactive_status_is_online(self):
+        with mock.patch.object(
+            app,
+            "fetch_url",
+            return_value=json.dumps({"error": "not found"}),
+        ):
+            self.assertEqual(
+                app.check_instance_status("https://foundry.example"),
+                ("offline", None, None),
+            )
+
+        with mock.patch.object(
+            app,
+            "fetch_url",
+            return_value=json.dumps({"active": False}),
+        ):
+            self.assertEqual(
+                app.check_instance_status("https://foundry.example"),
+                ("online", None, None),
+            )
+
     def test_non_object_payload_does_not_abort_status_refresh(self):
         config = {
             "instances": [
