@@ -35,6 +35,15 @@ assert.equal(
     'absolute status backgrounds should be rendered without prepending the instance URL'
 );
 
+assert.equal(
+    resolveBackgroundUrl(
+        'https://foundry.example',
+        '//cdn.example/world.webp'
+    ),
+    '//cdn.example/world.webp',
+    'protocol-relative status backgrounds should be rendered without prepending the instance URL'
+);
+
 const statusWithoutBackground = {
     url: 'https://foundry.example',
     background: '/static/images/background.jpg',

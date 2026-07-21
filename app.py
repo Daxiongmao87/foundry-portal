@@ -105,7 +105,7 @@ def check_instance_status(instance_url):
     background_url = None
     raw_background = data.get('background', '')
     if raw_background:
-        if raw_background.startswith('http'):
+        if raw_background.startswith('http') or raw_background.startswith('//'):
             background_url = raw_background
         else:
             background_url = base_url + '/' + raw_background.lstrip('/')

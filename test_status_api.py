@@ -88,6 +88,20 @@ class CheckInstanceStatusTests(unittest.TestCase):
         )
         fetch_url.assert_called_once_with("https://foundry.example/api/status")
 
+    def test_protocol_relative_background_is_preserved(self):
+        status_response = json.dumps({
+            "active": False,
+            "background": "//cdn.example/world.webp",
+        })
+
+        with mock.patch.object(app, "fetch_url", return_value=status_response):
+            result = app.check_instance_status("https://foundry.example")
+
+        self.assertEqual(
+            result,
+            ("online", None, "//cdn.example/world.webp"),
+        )
+
     def test_unavailable_or_invalid_status_api_is_offline(self):
         for response in (None, "not json"):
             with self.subTest(response=response):
