@@ -72,6 +72,39 @@ class CheckInstanceStatusTests(unittest.TestCase):
             ],
         )
 
+    def test_missing_status_endpoint_preserves_active_legacy_world(self):
+        join_html = """
+            <html>
+              <head><title>Legacy World</title></head>
+              <body><span>Current Players</span><strong>2</strong> / <strong>8</strong></body>
+            </html>
+        """
+        with patch(
+            "app.fetch_url",
+            side_effect=[None, join_html],
+        ) as fetch_url:
+            result = app.check_instance_status("https://foundry.example/")
+
+        self.assertEqual(
+            result,
+            (
+                "active",
+                {
+                    "name": "Legacy World",
+                    "background": "/static/images/background.jpg",
+                    "players": "2 / 8",
+                },
+                None,
+            ),
+        )
+        self.assertEqual(
+            fetch_url.call_args_list,
+            [
+                unittest.mock.call("https://foundry.example/api/status"),
+                unittest.mock.call("https://foundry.example/join"),
+            ],
+        )
+
     def test_failed_status_endpoint_falls_back_to_reachable_auth_route(self):
         with patch(
             "app.fetch_url",

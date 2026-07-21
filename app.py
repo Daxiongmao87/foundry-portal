@@ -96,6 +96,26 @@ def fetch_url(url, timeout=10):
         return None
 
 
+def parse_join_page(join_html):
+    """Extract an active world's title and player count from a join page."""
+    parser = TitleParser()
+    try:
+        parser.feed(join_html)
+    except (TypeError, ValueError):
+        return None, "Unknown / Unknown"
+
+    player_info = "Unknown / Unknown"
+    player_match = re.search(
+        r"Current\s+Players\s*(\d+)\s*/\s*(\d+)",
+        parser.text,
+        flags=re.IGNORECASE,
+    )
+    if player_match:
+        player_info = f"{player_match.group(1)} / {player_match.group(2)}"
+
+    return parser.title, player_info
+
+
 def check_instance_status(instance_url):
     """Check a Foundry instance through its built-in status HTTP API."""
     base_url = instance_url.rstrip('/')
@@ -108,12 +128,22 @@ def check_instance_status(instance_url):
         data = None
 
     if not isinstance(data, dict):
-        # Older Foundry releases do not provide /api/status. Probe their
-        # established entry routes over HTTP so a reachable instance is not
-        # mistaken for an offline one.
-        for route in ('/join', '/auth'):
-            if fetch_url(base_url + route) is not None:
-                return "online", None, None
+        # Older Foundry releases do not provide /api/status. Their join page
+        # still exposes the active world's title and player count.
+        join_html = fetch_url(base_url + '/join')
+        if join_html is not None:
+            world_name, player_info = parse_join_page(join_html)
+            if world_name:
+                active_world = {
+                    'name': world_name,
+                    'background': '/static/images/background.jpg',
+                    'players': player_info,
+                }
+                return "active", active_world, None
+            return "online", None, None
+
+        if fetch_url(base_url + '/auth') is not None:
+            return "online", None, None
         return "offline", None, None
 
     raw_background = data.get('background', '')
