@@ -1,5 +1,8 @@
+const PORTAL_BACKGROUND_FALLBACK = '/static/images/background.jpg';
+
 function resolveBackgroundUrl(instanceUrl, background) {
-    if (/^[a-z][a-z\d+.-]*:/i.test(background) || background.startsWith('//')) {
+    if (background === PORTAL_BACKGROUND_FALLBACK ||
+        /^[a-z][a-z\d+.-]*:/i.test(background) || background.startsWith('//')) {
         return background;
     }
 

@@ -34,3 +34,26 @@ assert.equal(
     'https://cdn.example/background.webp',
     'absolute status backgrounds should be rendered without prepending the instance URL'
 );
+
+const statusWithoutBackground = {
+    url: 'https://foundry.example',
+    background: '/static/images/background.jpg',
+    active_world: {
+        background: '/static/images/background.jpg'
+    }
+};
+
+assert.equal(
+    resolveBackgroundUrl(statusWithoutBackground.url, statusWithoutBackground.background),
+    '/static/images/background.jpg',
+    'the instance fallback should remain on the portal origin'
+);
+
+assert.equal(
+    resolveBackgroundUrl(
+        statusWithoutBackground.url,
+        statusWithoutBackground.active_world.background
+    ),
+    '/static/images/background.jpg',
+    'the active-world fallback should remain on the portal origin'
+);
