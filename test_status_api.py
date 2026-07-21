@@ -39,11 +39,10 @@ class CheckInstanceStatusTests(unittest.TestCase):
             ],
         )
 
-    def test_active_instance_falls_back_to_world_slug_and_default_background(self):
+    def test_active_instance_falls_back_when_optional_data_is_missing(self):
         status_response = json.dumps({
             "active": True,
             "world": "the-world-slug",
-            "friends": 0,
         })
 
         with mock.patch.object(app, "fetch_url", side_effect=[status_response, None]):
@@ -56,11 +55,23 @@ class CheckInstanceStatusTests(unittest.TestCase):
                 {
                     "name": "the-world-slug",
                     "background": "/static/images/background.jpg",
-                    "players": "0 connected",
+                    "players": "Unknown / Unknown",
                 },
                 None,
             ),
         )
+
+    def test_active_instance_preserves_explicit_zero_player_count(self):
+        status_response = json.dumps({
+            "active": True,
+            "world": "the-world-slug",
+            "friends": 0,
+        })
+
+        with mock.patch.object(app, "fetch_url", side_effect=[status_response, None]):
+            result = app.check_instance_status("https://foundry.example")
+
+        self.assertEqual(result[1]["players"], "0 connected")
 
     def test_inactive_instance_is_online_and_preserves_absolute_background(self):
         status_response = json.dumps({

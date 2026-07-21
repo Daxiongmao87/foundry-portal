@@ -116,10 +116,15 @@ def check_instance_status(instance_url):
             if parser.title:
                 world_name = parser.title
 
+        player_info = (
+            f"{data['friends']} connected"
+            if 'friends' in data
+            else "Unknown / Unknown"
+        )
         active_world = {
             'name': world_name,
             'background': background_url or '/static/images/background.jpg',
-            'players': f"{data.get('friends', 0)} connected"
+            'players': player_info
         }
         return "active", active_world, background_url
 
