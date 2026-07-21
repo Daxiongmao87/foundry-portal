@@ -97,6 +97,52 @@ class CheckInstanceStatusTests(unittest.TestCase):
                         ("offline", None, None),
                     )
 
+    def test_valid_non_object_status_payloads_are_offline(self):
+        for payload in (None, [], "online", 0, True):
+            with self.subTest(payload=payload):
+                with mock.patch.object(app, "fetch_url", return_value=json.dumps(payload)):
+                    self.assertEqual(
+                        app.check_instance_status("https://foundry.example"),
+                        ("offline", None, None),
+                    )
+
+    def test_non_object_payload_does_not_abort_status_refresh(self):
+        config = {
+            "instances": [
+                {"name": "Malformed", "url": "https://malformed.example"},
+                {"name": "Healthy", "url": "https://healthy.example"},
+            ]
+        }
+        responses = {
+            "https://malformed.example/api/status": "null",
+            "https://healthy.example/api/status": json.dumps({"active": False}),
+        }
+
+        with mock.patch.object(app, "instance_data_cache", [{"name": "stale"}]), \
+                mock.patch.object(app, "load_config", return_value=config), \
+                mock.patch.object(app, "fetch_url", side_effect=responses.get):
+            app.update_instance_statuses()
+
+            self.assertEqual(
+                app.instance_data_cache,
+                [
+                    {
+                        "name": "Malformed",
+                        "url": "https://malformed.example",
+                        "status": "offline",
+                        "active_world": None,
+                        "background": "/static/images/background.jpg",
+                    },
+                    {
+                        "name": "Healthy",
+                        "url": "https://healthy.example",
+                        "status": "online",
+                        "active_world": None,
+                        "background": "/static/images/background.jpg",
+                    },
+                ],
+            )
+
 
 class FetchUrlTests(unittest.TestCase):
     def test_network_errors_return_none(self):
