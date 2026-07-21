@@ -1,3 +1,18 @@
+const PORTAL_BACKGROUND_FALLBACK = '/static/images/background.jpg';
+
+function resolveBackgroundUrl(instanceUrl, background) {
+    if (background === PORTAL_BACKGROUND_FALLBACK ||
+        /^[a-z][a-z\d+.-]*:/i.test(background) || background.startsWith('//')) {
+        return background;
+    }
+
+    return `${instanceUrl.replace(/\/+$/, '')}/${background.replace(/^\/+/, '')}`;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { resolveBackgroundUrl };
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const sharedDataMode = document.getElementById('main-script').getAttribute('data-shared-data-mode') === 'true';
     const state = window.portalState || {};
@@ -248,7 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Add background image if available
             if (instance.background) {
-                instanceCard.style.backgroundImage = `url('${instance.url}${instance.background}')`;
+                instanceCard.style.backgroundImage = `url('${resolveBackgroundUrl(instance.url, instance.background)}')`;
                 instanceCard.style.backgroundSize = 'cover';
                 instanceCard.style.backgroundPosition = 'center';
             }
@@ -269,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 activeWorldsFound = true;
                 const worldCard = document.createElement('div');
                 worldCard.className = 'world-card';
-                worldCard.style.backgroundImage = `url('${instance.url}${instance.active_world.background}')`;
+                worldCard.style.backgroundImage = `url('${resolveBackgroundUrl(instance.url, instance.active_world.background)}')`;
                 worldCard.style.backgroundSize = 'cover';
                 worldCard.style.backgroundPosition = 'center';
 
