@@ -88,6 +88,22 @@ class CheckInstanceStatusTests(unittest.TestCase):
         )
         fetch_url.assert_called_once_with("https://foundry.example/api/status")
 
+    def test_absolute_background_scheme_is_case_insensitive(self):
+        for background in (
+            "HTTPS://cdn.example/world.webp",
+            "hTtP://cdn.example/world.webp",
+        ):
+            with self.subTest(background=background):
+                status_response = json.dumps({
+                    "active": False,
+                    "background": background,
+                })
+
+                with mock.patch.object(app, "fetch_url", return_value=status_response):
+                    result = app.check_instance_status("https://foundry.example")
+
+                self.assertEqual(result, ("online", None, background))
+
     def test_protocol_relative_background_is_preserved(self):
         status_response = json.dumps({
             "active": False,
