@@ -102,15 +102,18 @@ def check_instance_status(instance_url):
     background_url = None
 
     api_response = fetch_url(base_url + '/api/status')
-    if api_response is None:
-        return "offline", None, None
-
     try:
-        data = json.loads(api_response)
+        data = json.loads(api_response) if api_response is not None else None
     except (json.JSONDecodeError, TypeError):
-        return "offline", None, None
+        data = None
 
     if not isinstance(data, dict):
+        # Older Foundry releases do not provide /api/status. Probe their
+        # established entry routes over HTTP so a reachable instance is not
+        # mistaken for an offline one.
+        for route in ('/join', '/auth'):
+            if fetch_url(base_url + route) is not None:
+                return "online", None, None
         return "offline", None, None
 
     raw_background = data.get('background', '')

@@ -42,19 +42,68 @@ class FetchUrlTests(unittest.TestCase):
 
 
 class CheckInstanceStatusTests(unittest.TestCase):
-    def test_unreachable_instance_is_offline(self):
+    def test_unreachable_instance_is_offline_after_legacy_fallbacks_fail(self):
         with patch("app.fetch_url", return_value=None) as fetch_url:
             result = app.check_instance_status("https://foundry.example/")
 
         self.assertEqual(result, ("offline", None, None))
-        fetch_url.assert_called_once_with("https://foundry.example/api/status")
+        self.assertEqual(
+            fetch_url.call_args_list,
+            [
+                unittest.mock.call("https://foundry.example/api/status"),
+                unittest.mock.call("https://foundry.example/join"),
+                unittest.mock.call("https://foundry.example/auth"),
+            ],
+        )
 
-    def test_malformed_status_json_is_offline(self):
-        with patch("app.fetch_url", return_value="not json") as fetch_url:
+    def test_missing_status_endpoint_falls_back_to_reachable_join_route(self):
+        with patch(
+            "app.fetch_url",
+            side_effect=[None, "<html><body>Legacy Foundry join page</body></html>"],
+        ) as fetch_url:
+            result = app.check_instance_status("https://foundry.example/")
+
+        self.assertEqual(result, ("online", None, None))
+        self.assertEqual(
+            fetch_url.call_args_list,
+            [
+                unittest.mock.call("https://foundry.example/api/status"),
+                unittest.mock.call("https://foundry.example/join"),
+            ],
+        )
+
+    def test_failed_status_endpoint_falls_back_to_reachable_auth_route(self):
+        with patch(
+            "app.fetch_url",
+            side_effect=[None, None, "<html><body>Legacy Foundry auth page</body></html>"],
+        ) as fetch_url:
             result = app.check_instance_status("https://foundry.example")
 
-        self.assertEqual(result, ("offline", None, None))
-        fetch_url.assert_called_once_with("https://foundry.example/api/status")
+        self.assertEqual(result, ("online", None, None))
+        self.assertEqual(
+            fetch_url.call_args_list,
+            [
+                unittest.mock.call("https://foundry.example/api/status"),
+                unittest.mock.call("https://foundry.example/join"),
+                unittest.mock.call("https://foundry.example/auth"),
+            ],
+        )
+
+    def test_non_json_status_endpoint_uses_legacy_route_fallback(self):
+        with patch(
+            "app.fetch_url",
+            side_effect=["not json", "<html><body>Legacy Foundry join page</body></html>"],
+        ) as fetch_url:
+            result = app.check_instance_status("https://foundry.example")
+
+        self.assertEqual(result, ("online", None, None))
+        self.assertEqual(
+            fetch_url.call_args_list,
+            [
+                unittest.mock.call("https://foundry.example/api/status"),
+                unittest.mock.call("https://foundry.example/join"),
+            ],
+        )
 
     def test_inactive_instance_is_online_and_resolves_relative_background(self):
         response = json.dumps({
