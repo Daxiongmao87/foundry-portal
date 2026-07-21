@@ -81,16 +81,20 @@ class CheckInstanceStatusTests(unittest.TestCase):
 
         self.assertEqual(result, ("online", None, background))
 
-    def test_active_instance_uses_join_title_and_connected_friend_count(self):
+    def test_active_v13_instance_uses_join_title_and_player_counts(self):
         status_response = json.dumps({
             "active": True,
             "world": "world-slug",
-            "friends": 3,
             "background": "worlds/world-slug/background.webp",
         })
         responses = [
             status_response,
-            "<html><head><title>Human Readable World</title></head></html>",
+            """
+            <html>
+              <head><title>Human Readable World</title></head>
+              <body><span>Current Players</span><strong>3</strong> / <strong>10</strong></body>
+            </html>
+            """,
         ]
         with patch("app.fetch_url", side_effect=responses) as fetch_url:
             result = app.check_instance_status("https://foundry.example/")
@@ -103,7 +107,7 @@ class CheckInstanceStatusTests(unittest.TestCase):
                 {
                     "name": "Human Readable World",
                     "background": expected_background,
-                    "players": "3 connected",
+                    "players": "3 / 10",
                 },
                 expected_background,
             ),
@@ -116,7 +120,19 @@ class CheckInstanceStatusTests(unittest.TestCase):
             ],
         )
 
-    def test_active_instance_falls_back_to_slug_and_default_background(self):
+    def test_active_instance_does_not_treat_status_friends_as_player_count(self):
+        status_response = json.dumps({
+            "active": True,
+            "world": "world-slug",
+            "friends": 0,
+        })
+        join_html = "<html><body>Current Players 4 / 12</body></html>"
+        with patch("app.fetch_url", side_effect=[status_response, join_html]):
+            result = app.check_instance_status("https://foundry.example")
+
+        self.assertEqual(result[1]["players"], "4 / 12")
+
+    def test_active_instance_reports_unavailable_players_when_join_page_has_no_count(self):
         status_response = json.dumps({
             "active": True,
             "world": "world-slug",
@@ -131,7 +147,7 @@ class CheckInstanceStatusTests(unittest.TestCase):
                 {
                     "name": "world-slug",
                     "background": "/static/images/background.jpg",
-                    "players": "0 connected",
+                    "players": "Unknown / Unknown",
                 },
                 None,
             ),

@@ -1,6 +1,7 @@
 import atexit
 import json
 import os
+import re
 import ssl
 import urllib.request
 from functools import wraps
@@ -45,11 +46,12 @@ def save_config(config):
         yaml.dump(config, file)
 
 class TitleParser(HTMLParser):
-    """Extract the first non-empty HTML title."""
+    """Extract the title and text content from a Foundry join page."""
 
     def __init__(self):
         super().__init__()
         self.title = None
+        self.text_parts = []
         self._in_title = False
 
     def handle_starttag(self, tag, attrs):
@@ -61,8 +63,16 @@ class TitleParser(HTMLParser):
             self._in_title = False
 
     def handle_data(self, data):
-        if self._in_title and data.strip() and self.title is None:
-            self.title = data.strip()
+        text = data.strip()
+        if not text:
+            return
+        self.text_parts.append(text)
+        if self._in_title and self.title is None:
+            self.title = text
+
+    @property
+    def text(self):
+        return ' '.join(self.text_parts)
 
 
 def fetch_url(url, timeout=10):
@@ -112,6 +122,7 @@ def check_instance_status(instance_url):
 
     if data.get('active') and data.get('world'):
         world_name = data['world']
+        player_info = "Unknown / Unknown"
         join_html = fetch_url(base_url + '/join')
         if join_html:
             parser = TitleParser()
@@ -122,11 +133,18 @@ def check_instance_status(instance_url):
             if parser.title:
                 world_name = parser.title
 
-        player_count = data.get('friends', 0)
+            player_match = re.search(
+                r"Current\s+Players\s*(\d+)\s*/\s*(\d+)",
+                parser.text,
+                flags=re.IGNORECASE,
+            )
+            if player_match:
+                player_info = f"{player_match.group(1)} / {player_match.group(2)}"
+
         active_world = {
             'name': world_name,
             'background': background_url or '/static/images/background.jpg',
-            'players': f"{player_count} connected",
+            'players': player_info,
         }
         return "active", active_world, background_url
 
