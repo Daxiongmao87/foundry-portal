@@ -1,3 +1,16 @@
+function resolveBackgroundUrl(instanceUrl, backgroundUrl) {
+    if (/^https?:\/\//i.test(backgroundUrl)) {
+        return backgroundUrl;
+    }
+
+    return `${instanceUrl.replace(/\/+$/, '')}/${backgroundUrl.replace(/^\/+/, '')}`;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { resolveBackgroundUrl };
+}
+
+if (typeof document !== 'undefined') {
 document.addEventListener('DOMContentLoaded', () => {
     const sharedDataMode = document.getElementById('main-script').getAttribute('data-shared-data-mode') === 'true';
     const state = window.portalState || {};
@@ -248,7 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Add background image if available
             if (instance.background) {
-                instanceCard.style.backgroundImage = `url('${instance.url}${instance.background}')`;
+                instanceCard.style.backgroundImage = `url('${resolveBackgroundUrl(instance.url, instance.background)}')`;
                 instanceCard.style.backgroundSize = 'cover';
                 instanceCard.style.backgroundPosition = 'center';
             }
@@ -269,7 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 activeWorldsFound = true;
                 const worldCard = document.createElement('div');
                 worldCard.className = 'world-card';
-                worldCard.style.backgroundImage = `url('${instance.url}${instance.active_world.background}')`;
+                worldCard.style.backgroundImage = `url('${resolveBackgroundUrl(instance.url, instance.active_world.background)}')`;
                 worldCard.style.backgroundSize = 'cover';
                 worldCard.style.backgroundPosition = 'center';
 
@@ -304,3 +317,4 @@ document.addEventListener('DOMContentLoaded', () => {
         setInterval(fetchStatus, 5000);
     }
 });
+}
