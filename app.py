@@ -1,16 +1,15 @@
-import os
-import yaml
-import re
-from functools import wraps
-from flask import Flask, render_template, jsonify, request, session, redirect, url_for
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, WebDriverException
-from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
+import json
+import os
+import re
+import ssl
+import urllib.request
+from functools import wraps
+from html.parser import HTMLParser
+
+import yaml
+from apscheduler.schedulers.background import BackgroundScheduler
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
 
 # Initialize the Flask application
@@ -46,81 +45,143 @@ def save_config(config):
     with open(CONFIG_FILE, 'w') as file:
         yaml.dump(config, file)
 
-def check_instance_status(instance_url):
-    """
-    Check the status of a Foundry instance by navigating to its URL using Selenium.
-    Uses regex to parse player counts from the body text.
-    """
-    options = Options()
-    options.add_argument('--headless')
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
-    options.add_argument('--disable-gpu')
-    options.add_argument('window-size=1920x1080')
-    options.add_argument('--ignore-certificate-errors')
+class TitleParser(HTMLParser):
+    """Extract the title and text content from a Foundry join page."""
 
-    driver = webdriver.Chrome(options=options)
+    def __init__(self):
+        super().__init__()
+        self.title = None
+        self.text_parts = []
+        self._in_title = False
 
-    status = "offline"
-    active_world = None
-    background_url = None
+    def handle_starttag(self, tag, attrs):
+        if tag.lower() == 'title':
+            self._in_title = True
+
+    def handle_endtag(self, tag):
+        if tag.lower() == 'title':
+            self._in_title = False
+
+    def handle_data(self, data):
+        text = data.strip()
+        if not text:
+            return
+        self.text_parts.append(text)
+        if self._in_title and self.title is None:
+            self.title = text
+
+    @property
+    def text(self):
+        return ' '.join(self.text_parts)
+
+
+def fetch_url(url, timeout=10):
+    """Fetch a URL while allowing Foundry instances with self-signed TLS."""
+    context = ssl.create_default_context()
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    request = urllib.request.Request(
+        url,
+        headers={'User-Agent': 'FoundryPortal/1.0'},
+    )
 
     try:
-        driver.get(instance_url)
+        with urllib.request.urlopen(
+            request,
+            timeout=timeout,
+            context=context,
+        ) as response:
+            return response.read().decode('utf-8')
+    except Exception:
+        return None
 
-        if "/auth" in driver.current_url:
-            status = "online"
-            # Try to get background
-            try:
-                background_url = driver.execute_script("""
-                    var background = getComputedStyle(document.body).getPropertyValue('--background-url').trim();
-                    background = background.replace(/^url\\(["']?/, '').replace(/["']?\\)$/, '');
-                    return background;
-                """)
-            except:
-                pass
 
-        elif "/join" in driver.current_url:
-            WebDriverWait(driver, 10).until(EC.title_contains(""))
-            world_name = driver.title
+def parse_join_page(join_html):
+    """Extract an active world's title and player count from a join page."""
+    parser = TitleParser()
+    try:
+        parser.feed(join_html)
+    except (TypeError, ValueError):
+        return None, "Unknown / Unknown"
 
+    player_info = "Unknown / Unknown"
+    player_match = re.search(
+        r"Current\s+Players\s*(\d+)\s*/\s*(\d+)",
+        parser.text,
+        flags=re.IGNORECASE,
+    )
+    if player_match:
+        player_info = f"{player_match.group(1)} / {player_match.group(2)}"
+
+    return parser.title, player_info
+
+
+def check_instance_status(instance_url):
+    """Check a Foundry instance through its built-in status HTTP API."""
+    base_url = instance_url.rstrip('/')
+    background_url = None
+
+    api_response = fetch_url(base_url + '/api/status')
+    try:
+        data = json.loads(api_response) if api_response is not None else None
+    except (json.JSONDecodeError, TypeError):
+        data = None
+
+    if not isinstance(data, dict):
+        # Older Foundry releases do not provide /api/status. Their join page
+        # still exposes the active world's title and player count.
+        join_html = fetch_url(base_url + '/join')
+        if join_html is not None:
+            world_name, player_info = parse_join_page(join_html)
             if world_name:
-                # Try to get background
-                try:
-                    background_url = driver.execute_script("""
-                        var background = getComputedStyle(document.body).getPropertyValue('--background-url').trim();
-                        background = background.replace(/^url\\(["']?/, '').replace(/["']?\\)$/, '');
-                        return background;
-                    """)
-                except:
-                    pass
+                active_world = {
+                    'name': world_name,
+                    'background': '/static/images/background.jpg',
+                    'players': player_info,
+                }
+                return "active", active_world, None
+            return "online", None, None
 
-                # Get player count using regex on body text
-                try:
-                    body_text = driver.find_element(By.TAG_NAME, "body").text
-                    # Look for "Current Players X / Y" pattern
-                    # Adjust regex to be flexible with whitespace
-                    match = re.search(r"Current Players\s*(\d+)\s*/\s*(\d+)", body_text)
-                    if match:
-                        player_info = f"{match.group(1)} / {match.group(2)}"
-                    else:
-                        player_info = "Unknown / Unknown"
-                except:
-                    player_info = "Unknown / Unknown"
+        if fetch_url(base_url + '/auth') is not None:
+            return "online", None, None
+        return "offline", None, None
 
-                if world_name:
-                    active_world = {
-                        'name': world_name,
-                        'background': background_url,
-                        'players': player_info
-                    }
-                    status = "active"
-    except (TimeoutException, WebDriverException):
-        status = "offline"
-    finally:
-        driver.quit()
+    raw_background = data.get('background', '')
+    if isinstance(raw_background, str) and raw_background:
+        if raw_background.startswith(('http://', 'https://')):
+            background_url = raw_background
+        else:
+            background_url = base_url + '/' + raw_background.lstrip('/')
 
-    return status, active_world, background_url
+    if data.get('active') and data.get('world'):
+        world_name = data['world']
+        player_info = "Unknown / Unknown"
+        join_html = fetch_url(base_url + '/join')
+        if join_html:
+            parser = TitleParser()
+            try:
+                parser.feed(join_html)
+            except (TypeError, ValueError):
+                pass
+            if parser.title:
+                world_name = parser.title
+
+            player_match = re.search(
+                r"Current\s+Players\s*(\d+)\s*/\s*(\d+)",
+                parser.text,
+                flags=re.IGNORECASE,
+            )
+            if player_match:
+                player_info = f"{player_match.group(1)} / {player_match.group(2)}"
+
+        active_world = {
+            'name': world_name,
+            'background': background_url or '/static/images/background.jpg',
+            'players': player_info,
+        }
+        return "active", active_world, background_url
+
+    return "online", None, background_url
 
 def initialize_instance_data():
     global instance_data_cache
@@ -295,7 +356,7 @@ def home():
 
 # Initialize the background scheduler
 scheduler = BackgroundScheduler()
-scheduler.add_job(func=update_instance_statuses, trigger="interval", seconds=10)
+scheduler.add_job(func=update_instance_statuses, trigger="interval", seconds=30)
 scheduler.start()
 
 atexit.register(lambda: scheduler.shutdown())
