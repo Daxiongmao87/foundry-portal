@@ -71,12 +71,11 @@ def fetch_url(url, timeout=10):
     context = ssl.create_default_context()
     context.check_hostname = False
     context.verify_mode = ssl.CERT_NONE
-    request = urllib.request.Request(
-        url,
-        headers={'User-Agent': 'FoundryPortal/1.0'},
-    )
-
     try:
+        request = urllib.request.Request(
+            url,
+            headers={'User-Agent': 'FoundryPortal/1.0'},
+        )
         with urllib.request.urlopen(
             request,
             timeout=timeout,

@@ -248,10 +248,84 @@ class CheckInstanceStatusTests(unittest.TestCase):
             )
 
 
+    def test_invalid_instance_urls_do_not_abort_status_refresh(self):
+        config = {
+            "instances": [
+                {"name": "Empty", "url": ""},
+                {"name": "Schemaless", "url": "foundry.example"},
+                {"name": "Malformed", "url": "http://[invalid"},
+                {"name": "Healthy", "url": "https://healthy.example"},
+            ]
+        }
+        response = mock.MagicMock()
+        response.read.return_value = json.dumps({"active": False}).encode("utf-8")
+        response_context = mock.MagicMock()
+        response_context.__enter__.return_value = response
+
+        with mock.patch.object(app, "instance_data_cache", [{"name": "stale"}]), \
+                mock.patch.object(app, "load_config", return_value=config), \
+                mock.patch(
+                    "app.urllib.request.urlopen",
+                    return_value=response_context,
+                ) as urlopen:
+            app.update_instance_statuses()
+
+            self.assertEqual(
+                app.instance_data_cache,
+                [
+                    {
+                        "name": "Empty",
+                        "url": "",
+                        "status": "offline",
+                        "active_world": None,
+                        "background": "/static/images/background.jpg",
+                    },
+                    {
+                        "name": "Schemaless",
+                        "url": "foundry.example",
+                        "status": "offline",
+                        "active_world": None,
+                        "background": "/static/images/background.jpg",
+                    },
+                    {
+                        "name": "Malformed",
+                        "url": "http://[invalid",
+                        "status": "offline",
+                        "active_world": None,
+                        "background": "/static/images/background.jpg",
+                    },
+                    {
+                        "name": "Healthy",
+                        "url": "https://healthy.example",
+                        "status": "online",
+                        "active_world": None,
+                        "background": "/static/images/background.jpg",
+                    },
+                ],
+            )
+
+        self.assertEqual(urlopen.call_count, 1)
+        self.assertEqual(
+            urlopen.call_args[0][0].full_url,
+            "https://healthy.example/api/status",
+        )
+
+
 class FetchUrlTests(unittest.TestCase):
     def test_network_errors_return_none(self):
         with mock.patch("app.urllib.request.urlopen", side_effect=URLError("unreachable")):
             self.assertIsNone(app.fetch_url("https://foundry.example/api/status"))
+
+    def test_invalid_urls_return_none_before_opening_a_connection(self):
+        for url in (
+            "",
+            "foundry.example/api/status",
+            "http://[invalid/api/status",
+        ):
+            with self.subTest(url=url):
+                with mock.patch("app.urllib.request.urlopen") as urlopen:
+                    self.assertIsNone(app.fetch_url(url))
+                urlopen.assert_not_called()
 
 
 if __name__ == "__main__":
