@@ -21,10 +21,8 @@ Before setting up Foundry Portal, ensure you have the following installed on you
 - **Python 3.7+**
   - `pip`
   - `venv` (optional, but recommended)
-- **Google Chrome Browser**
-- **ChromeDriver** compatible with your Chrome version
-  - [Download ChromeDriver](https://developer.chrome.com/docs/chromedriver/downloads)
-  - Ensure `chromedriver` is in your system's PATH or specify its location in the code.
+
+Instance status checks use Foundry's built-in HTTP API, so no browser or browser driver is required.
 
 
 ## Installation
@@ -50,8 +48,6 @@ Before setting up Foundry Portal, ensure you have the following installed on you
    ```bash
    pip install -r requirements.txt
    ```
-
-   **Note**: If you encounter issues with `selenium`, ensure that the ChromeDriver version matches your installed Chrome browser version.
 
 ## Running With Docker
 1. **Clone the Repository**
@@ -140,10 +136,6 @@ Open your web browser and navigate to `http://127.0.0.1:5000` (or replace `127.0
 - **Activate World**: If `shared_data_mode` is enabled, use the "Activate World" button to redirect to any available online instance to activate a world.
 
 ## Troubleshooting
-
-- **Selenium WebDriver Issues**:
-  - Ensure that ChromeDriver is installed and matches your Chrome browser version.
-  - Verify that ChromeDriver is in your system's PATH. If not, specify its path in `app.py` where the WebDriver is initialized.
 
 - **Configuration Errors**:
   - Ensure `config.yaml` adheres to proper YAML syntax.
