@@ -118,6 +118,19 @@ class CheckInstanceStatusTests(unittest.TestCase):
             ("online", None, "//cdn.example/world.webp"),
         )
 
+    def test_truthy_non_string_background_is_treated_as_absent(self):
+        for background in (1, True, ["world.webp"], {"url": "world.webp"}):
+            with self.subTest(background=background):
+                status_response = json.dumps({
+                    "active": False,
+                    "background": background,
+                })
+
+                with mock.patch.object(app, "fetch_url", return_value=status_response):
+                    result = app.check_instance_status("https://foundry.example")
+
+                self.assertEqual(result, ("online", None, None))
+
     def test_unavailable_or_invalid_status_api_is_offline(self):
         for response in (None, "not json"):
             with self.subTest(response=response):
@@ -155,6 +168,46 @@ class CheckInstanceStatusTests(unittest.TestCase):
             self.assertEqual(
                 app.check_instance_status("https://foundry.example"),
                 ("online", None, None),
+            )
+
+    def test_non_string_background_does_not_abort_status_refresh(self):
+        config = {
+            "instances": [
+                {"name": "Malformed", "url": "https://malformed.example"},
+                {"name": "Healthy", "url": "https://healthy.example"},
+            ]
+        }
+        responses = {
+            "https://malformed.example/api/status": json.dumps({
+                "active": False,
+                "background": 1,
+            }),
+            "https://healthy.example/api/status": json.dumps({"active": False}),
+        }
+
+        with mock.patch.object(app, "instance_data_cache", [{"name": "stale"}]), \
+                mock.patch.object(app, "load_config", return_value=config), \
+                mock.patch.object(app, "fetch_url", side_effect=responses.get):
+            app.update_instance_statuses()
+
+            self.assertEqual(
+                app.instance_data_cache,
+                [
+                    {
+                        "name": "Malformed",
+                        "url": "https://malformed.example",
+                        "status": "online",
+                        "active_world": None,
+                        "background": "/static/images/background.jpg",
+                    },
+                    {
+                        "name": "Healthy",
+                        "url": "https://healthy.example",
+                        "status": "online",
+                        "active_world": None,
+                        "background": "/static/images/background.jpg",
+                    },
+                ],
             )
 
     def test_non_object_payload_does_not_abort_status_refresh(self):
