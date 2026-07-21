@@ -2,7 +2,6 @@ import atexit
 import json
 import os
 import ssl
-import urllib.error
 import urllib.request
 from functools import wraps
 from html.parser import HTMLParser
