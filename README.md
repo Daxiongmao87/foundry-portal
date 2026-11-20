@@ -5,7 +5,7 @@
 
 ## Features
 
-- **Real-Time Monitoring**: Keeps track of the status (`offline`, `online`, `active`) of each configured Foundry instance.
+- **Real-Time Monitoring**: Keeps track of the status (`offline`, `online`, `active`) of each configured Foundry instance using Foundry's own HTTP endpoints, so no browser automation is required on the server.
 - **Active Worlds Display**: Showcases currently active worlds with details like player counts and hosting instances.
 - **Shared Data Mode**: Enables an "Activate World" button when instances share the same data folder, allowing users to activate worlds across any available instance.
 - **Dynamic Updates**: Utilizes a background scheduler to refresh instance statuses at regular intervals without manual intervention.
@@ -18,13 +18,9 @@
 
 Before setting up Foundry Portal, ensure you have the following installed on your system:
 
-- **Python 3.7+**
+- **Python 3.8+**
   - `pip`
   - `venv` (optional, but recommended)
-- **Google Chrome Browser**
-- **ChromeDriver** compatible with your Chrome version
-  - [Download ChromeDriver](https://developer.chrome.com/docs/chromedriver/downloads)
-  - Ensure `chromedriver` is in your system's PATH or specify its location in the code.
 
 
 ## Installation
@@ -51,7 +47,7 @@ Before setting up Foundry Portal, ensure you have the following installed on you
    pip install -r requirements.txt
    ```
 
-   **Note**: If you encounter issues with `selenium`, ensure that the ChromeDriver version matches your installed Chrome browser version.
+   The portal only needs Flask, APScheduler, PyYAML and Werkzeug. Instance status is read over HTTP, so no browser or WebDriver is installed.
 
 ## Running With Docker
 1. **Clone the Repository**
@@ -138,12 +134,23 @@ Open your web browser and navigate to `http://127.0.0.1:5000` (or replace `127.0
   - **Online**: Instance is online but not actively hosting a world.
   - **Offline**: Instance is not reachable.
 - **Activate World**: If `shared_data_mode` is enabled, use the "Activate World" button to redirect to any available online instance to activate a world.
+- **Player Counts**: Active worlds show `Players: N connected`. Foundry's `/api/status` endpoint reports connected players only, not the configured slot limit, so no maximum is shown.
+
+## Administration
+
+The gear icon in the header opens the admin dialog.
+
+- **First run**: with no admin password stored, the portal serves a setup form, and that form is reachable only from loopback (`http://127.0.0.1:5000`). Set `PORTAL_ALLOW_REMOTE_INIT=1` if you must bootstrap through a reverse proxy, and unset it afterwards.
+- **Password recovery**: run `python3 reset_password.py` in the portal directory on the server and follow the prompt.
+- **Viewer password**: an optional second password in the configuration dialog gates read-only access to the dashboard and `/api/instance-status`.
+- **Session secret**: a random key is generated on first start and stored in `.secret_key` (mode `0600`) so sessions survive restarts. Set `PORTAL_SECRET_KEY`, or `PORTAL_SECRET_FILE` for another location, to manage it yourself.
+- **Configuration writes**: the configuration dialog validates every instance name and URL and writes `config.yaml` atomically, so a rejected payload cannot leave a half-written file behind.
 
 ## Troubleshooting
 
-- **Selenium WebDriver Issues**:
-  - Ensure that ChromeDriver is installed and matches your Chrome browser version.
-  - Verify that ChromeDriver is in your system's PATH. If not, specify its path in `app.py` where the WebDriver is initialized.
+- **All Instances Offline**:
+  - The portal probes `<instance url>/api/status` and falls back to the `<instance url>/join` page. Both must be reachable from the machine running the portal; test with `curl -sS <instance url>/api/status`.
+  - Foundry only serves `/api/status` once it is listening, so an instance that is starting up legitimately reports `offline` until it answers.
 
 - **Configuration Errors**:
   - Ensure `config.yaml` adheres to proper YAML syntax.
@@ -155,6 +162,16 @@ Open your web browser and navigate to `http://127.0.0.1:5000` (or replace `127.0
     ```python
     app.run(debug=True, port=5001)
     ```
+
+## Tests
+
+The suite is stdlib `unittest` and needs no browser:
+
+```bash
+PYTHONPATH=. python3 -m unittest discover -s tests -p 'test_*.py'
+```
+
+Each file is also runnable on its own, for example `PYTHONPATH=. python3 tests/test_status.py`.
 
 ## Contributing
 

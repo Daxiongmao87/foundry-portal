@@ -1,306 +1,485 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const sharedDataMode = document.getElementById('main-script').getAttribute('data-shared-data-mode') === 'true';
-    const state = window.portalState || {};
+/* Foundry Portal front-end.
+ *
+ * Statuses are rendered from /api/instance-status. Every card is a real link
+ * so the dashboard works with a keyboard, and all text reaches the DOM through
+ * textContent so a world title cannot inject markup.
+ */
+(function () {
+    "use strict";
 
-    // --- Modal Elements ---
-    const initModal = document.getElementById('init-modal');
-    const loginModal = document.getElementById('login-modal');
-    const configModal = document.getElementById('config-modal');
-    const viewerLock = document.getElementById('viewer-lock');
-    const adminBtn = document.getElementById('admin-btn');
-    const closeBtns = document.querySelectorAll('.close');
+    var POLL_INTERVAL_MS = 10000;
+    var STATUS_LABELS = {
+        active: "Active",
+        online: "Online",
+        offline: "Offline",
+        error: "Error"
+    };
 
-    // --- Initialization Flow ---
-    if (!state.isConfigured) {
-        initModal.style.display = 'block';
-    } else if (state.viewerLocked) {
-        viewerLock.style.display = 'block';
-    }
+    var state = readPortalState();
+    var sharedDataMode = state.sharedDataMode;
+    var lastSignature = "";
+    var lastFetchedAt = null;
+    var fetchFailed = false;
 
-    // --- Event Listeners ---
+    var elements = {
+        worldsGallery: document.getElementById("worlds-gallery"),
+        instanceList: document.getElementById("instance-list"),
+        lastUpdated: document.getElementById("last-updated"),
+        initModal: document.getElementById("init-modal"),
+        loginModal: document.getElementById("login-modal"),
+        configModal: document.getElementById("config-modal"),
+        viewerLock: document.getElementById("viewer-lock"),
+        adminBtn: document.getElementById("admin-btn"),
+        instancesContainer: document.getElementById("instances-container")
+    };
 
-    // Admin Button
-    if (adminBtn) {
-        adminBtn.addEventListener('click', () => {
-            if (state.isAdmin) {
-                openConfigModal();
-            } else {
-                openLoginModal();
-            }
-        });
-    }
-
-    // Close Modals
-    closeBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            btn.closest('.modal').style.display = 'none';
-        });
-    });
-
-    // Init Form
-    const initForm = document.getElementById('init-form');
-    if (initForm) {
-        initForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const password = document.getElementById('init-password').value;
-            try {
-                const response = await fetch('/api/init', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ admin_password: password })
-                });
-                if (response.ok) {
-                    location.reload();
-                } else {
-                    alert('Initialization failed');
-                }
-            } catch (err) {
-                console.error(err);
-                alert('Error initializing');
-            }
-        });
-    }
-
-    // Login Form
-    const loginForm = document.getElementById('login-form');
-    if (loginForm) {
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const password = document.getElementById('login-password').value;
-            const role = document.getElementById('login-role').value;
-
-            try {
-                const response = await fetch('/api/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password, role })
-                });
-
-                if (response.ok) {
-                    loginModal.style.display = 'none';
-                    if (role === 'admin') {
-                        state.isAdmin = true;
-                        openConfigModal();
-                    }
-                } else {
-                    alert('Invalid password');
-                }
-            } catch (err) {
-                console.error(err);
-                alert('Login error');
-            }
-        });
-    }
-
-    // Viewer Form
-    const viewerForm = document.getElementById('viewer-form');
-    if (viewerForm) {
-        viewerForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const password = document.getElementById('viewer-password').value;
-
-            try {
-                const response = await fetch('/api/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password, role: 'viewer' })
-                });
-
-                if (response.ok) {
-                    location.reload();
-                } else {
-                    alert('Invalid password');
-                }
-            } catch (err) {
-                console.error(err);
-                alert('Login error');
-            }
-        });
-    }
-
-    // Config Form
-    const configForm = document.getElementById('config-form');
-    if (configForm) {
-        configForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = {
-                shared_data_mode: document.getElementById('shared-data-mode').checked,
-                instances: getInstancesFromDOM(),
-                new_admin_password: document.getElementById('new-admin-password').value,
-                new_viewer_password: document.getElementById('new-viewer-password').value
-            };
-
-            try {
-                const response = await fetch('/api/config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(formData)
-                });
-
-                if (response.ok) {
-                    alert('Configuration saved!');
-                    configModal.style.display = 'none';
-                    location.reload();
-                } else {
-                    alert('Failed to save configuration');
-                }
-            } catch (err) {
-                console.error(err);
-                alert('Error saving configuration');
-            }
-        });
-    }
-
-    // Add Instance Button
-    const addInstanceBtn = document.getElementById('add-instance-btn');
-    if (addInstanceBtn) {
-        addInstanceBtn.addEventListener('click', () => {
-            addInstanceRow();
-        });
-    }
-
-    // --- Helper Functions ---
-
-    function openLoginModal() {
-        loginModal.style.display = 'block';
-        document.getElementById('login-password').value = '';
-        document.getElementById('login-password').focus();
-    }
-
-    async function openConfigModal() {
+    function readPortalState() {
+        var node = document.getElementById("portal-state");
+        if (!node) {
+            return { isConfigured: false, viewerLocked: false, isAdmin: false, sharedDataMode: false };
+        }
         try {
-            const response = await fetch('/api/config');
-            if (response.ok) {
-                const config = await response.json();
-                populateConfigForm(config);
-                configModal.style.display = 'block';
-            } else {
-                // Session might have expired
-                state.isAdmin = false;
-                openLoginModal();
+            return JSON.parse(node.textContent);
+        } catch (err) {
+            console.error("Could not read portal state", err);
+            return { isConfigured: false, viewerLocked: false, isAdmin: false, sharedDataMode: false };
+        }
+    }
+
+    function el(tag, className, text) {
+        var node = document.createElement(tag);
+        if (className) {
+            node.className = className;
+        }
+        if (text !== undefined && text !== null) {
+            node.textContent = String(text);
+        }
+        return node;
+    }
+
+    function safeUrl(candidate, base) {
+        if (!candidate) {
+            return null;
+        }
+        try {
+            var url = new URL(candidate, base || window.location.origin);
+            if (url.protocol === "http:" || url.protocol === "https:") {
+                return url.href;
             }
         } catch (err) {
-            console.error(err);
+            /* fall through */
+        }
+        return null;
+    }
+
+    function applyBackground(node, candidate, base) {
+        var url = safeUrl(candidate, base);
+        if (url) {
+            node.style.backgroundImage = 'url("' + url.replace(/"/g, "%22") + '")';
         }
     }
 
-    function populateConfigForm(config) {
-        document.getElementById('shared-data-mode').checked = config.shared_data_mode;
-        const container = document.getElementById('instances-container');
-        container.innerHTML = '';
-        config.instances.forEach(inst => addInstanceRow(inst));
-
-        // Reset password fields
-        document.getElementById('new-admin-password').value = '';
-        document.getElementById('new-viewer-password').value = '';
+    function joinUrl(instanceUrl) {
+        var base = safeUrl(instanceUrl);
+        if (!base) {
+            return null;
+        }
+        return base.replace(/\/+$/, "") + "/join";
     }
 
-    function addInstanceRow(data = { name: '', url: '' }) {
-        const container = document.getElementById('instances-container');
-        const div = document.createElement('div');
-        div.className = 'instance-row form-group';
-        div.innerHTML = `
-            <input type="text" placeholder="Name" value="${data.name}" class="instance-name" required>
-            <input type="url" placeholder="URL" value="${data.url}" class="instance-url" required>
-            <button type="button" class="btn-danger remove-instance">&times;</button>
-        `;
+    // --- Dashboard ---------------------------------------------------------
 
-        div.querySelector('.remove-instance').addEventListener('click', () => {
-            div.remove();
+    function buildWorldCard(instance) {
+        var world = instance.active_world;
+        var card = el("a", "world-card");
+        var target = joinUrl(instance.url);
+        if (target) {
+            card.href = target;
+        } else {
+            card.href = "#";
+            card.setAttribute("aria-disabled", "true");
+        }
+        applyBackground(card, world.background || instance.background, instance.url);
+
+        var info = el("div", "world-card-info");
+        info.appendChild(el("h3", null, world.name || "Unnamed world"));
+        if (world.players) {
+            info_meta(info, "Players: " + world.players);
+        }
+        info_meta(info, "Hosted on: " + instance.name);
+        card.appendChild(info);
+        return card;
+    }
+
+    function info_meta(parent, text) {
+        parent.appendChild(el("p", "world-card-meta", text));
+    }
+
+    function buildActivateCard(instances) {
+        var available = instances.filter(function (instance) {
+            return instance.status === "online" || instance.status === "active";
+        })[0];
+        if (!available) {
+            return null;
+        }
+        var card = el("a", "world-card add-new");
+        var target = joinUrl(available.url);
+        card.href = target || "#";
+        card.appendChild(el("h3", null, "Activate World"));
+        card.appendChild(el("span", "add-new-icon", "+"));
+        card.setAttribute("aria-label", "Activate a world on " + available.name);
+        return card;
+    }
+
+    function buildInstanceCard(instance) {
+        var status = STATUS_LABELS[instance.status] ? instance.status : "error";
+        var card = el("a", "instance-card " + status);
+        var target = safeUrl(instance.url);
+        if (target) {
+            card.href = target;
+        } else {
+            card.href = "#";
+            card.setAttribute("aria-disabled", "true");
+        }
+        applyBackground(card, instance.background, instance.url);
+
+        var info = el("div", "instance-info-container");
+        var header = el("div", "instance-header");
+        var dot = el("span", "status-indicator " + instance.status);
+        var label = STATUS_LABELS[instance.status] || "Unknown";
+        dot.setAttribute("title", label);
+        header.appendChild(dot);
+        header.appendChild(el("h3", null, instance.name));
+        header.appendChild(el("span", "visually-hidden", "Status: " + label));
+        info.appendChild(header);
+        info.appendChild(el("p", "instance-url", instance.url));
+        card.appendChild(info);
+        return card;
+    }
+
+    function render(instances) {
+        var gallery = elements.worldsGallery;
+        var list = elements.instanceList;
+        gallery.textContent = "";
+        list.textContent = "";
+
+        var activeWorlds = instances.filter(function (instance) {
+            return instance.status === "active" && instance.active_world;
         });
 
-        container.appendChild(div);
+        activeWorlds.forEach(function (instance) {
+            gallery.appendChild(buildWorldCard(instance));
+        });
+
+        if (sharedDataMode) {
+            var activate = buildActivateCard(instances);
+            if (activate) {
+                gallery.appendChild(activate);
+            }
+        }
+
+        if (!gallery.childElementCount) {
+            gallery.appendChild(el("p", "no-worlds", "No worlds are active right now."));
+        }
+
+        instances.forEach(function (instance) {
+            list.appendChild(buildInstanceCard(instance));
+        });
+        if (!instances.length) {
+            list.appendChild(el("p", "no-worlds", "No instances are configured."));
+        }
     }
 
-    function getInstancesFromDOM() {
-        const rows = document.querySelectorAll('.instance-row');
-        return Array.from(rows).map(row => ({
-            name: row.querySelector('.instance-name').value,
-            url: row.querySelector('.instance-url').value
-        }));
+    function renderUpdated() {
+        if (!elements.lastUpdated) {
+            return;
+        }
+        if (fetchFailed || !lastFetchedAt) {
+            elements.lastUpdated.textContent = "Status unavailable - retrying.";
+            return;
+        }
+        var ageSeconds = Math.round((Date.now() - lastFetchedAt) / 1000);
+        elements.lastUpdated.textContent = "Updated " + ageSeconds + "s ago";
     }
 
-    // --- Polling for Status (Existing Logic) ---
     function fetchStatus() {
-        if (state.viewerLocked || !state.isConfigured) return;
-
-        fetch('/api/instance-status')
-            .then(response => response.json())
-            .then(data => {
-                updateDashboard(data);
+        var request = new Request("/api/instance-status", { credentials: "same-origin" });
+        fetch(request)
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error("Status request failed with HTTP " + response.status);
+                }
+                return response.json();
             })
-            .catch(error => console.error('Error fetching status:', error));
+            .then(function (instances) {
+                fetchFailed = false;
+                lastFetchedAt = Date.now();
+                var signature = JSON.stringify(instances);
+                if (signature !== lastSignature) {
+                    lastSignature = signature;
+                    render(instances);
+                }
+                renderUpdated();
+            })
+            .catch(function (err) {
+                console.error("Error fetching instance statuses:", err);
+                fetchFailed = true;
+                renderUpdated();
+            });
     }
 
-    function updateDashboard(instances) {
-        const worldsGallery = document.getElementById('worlds-gallery');
-        const instanceList = document.getElementById('instance-list');
+    // --- Modals ------------------------------------------------------------
 
-        worldsGallery.innerHTML = '';
-        instanceList.innerHTML = '';
-
-        let activeWorldsFound = false;
-
-        instances.forEach(instance => {
-            // Update Instance List
-            const instanceCard = document.createElement('div');
-            instanceCard.className = `instance-card ${instance.status}`;
-
-            // Add background image if available
-            if (instance.background) {
-                instanceCard.style.backgroundImage = `url('${instance.url}${instance.background}')`;
-                instanceCard.style.backgroundSize = 'cover';
-                instanceCard.style.backgroundPosition = 'center';
+    function showModal(modal) {
+        if (modal) {
+            modal.hidden = false;
+            var focusable = modal.querySelector("input, button");
+            if (focusable) {
+                focusable.focus();
             }
-
-            instanceCard.innerHTML = `
-                <div class="instance-info-container">
-                    <div class="instance-header">
-                        <span class="status-dot"></span>
-                        <h3>${instance.name}</h3>
-                    </div>
-                    <p class="instance-url"><a href="${instance.url}" target="_blank">${instance.url}</a></p>
-                </div>
-            `;
-            instanceList.appendChild(instanceCard);
-
-            // Update Active Worlds
-            if (instance.status === 'active' && instance.active_world) {
-                activeWorldsFound = true;
-                const worldCard = document.createElement('div');
-                worldCard.className = 'world-card';
-                worldCard.style.backgroundImage = `url('${instance.url}${instance.active_world.background}')`;
-                worldCard.style.backgroundSize = 'cover';
-                worldCard.style.backgroundPosition = 'center';
-
-                const worldName = document.createElement('h3');
-                worldName.textContent = instance.active_world.name;
-                worldCard.appendChild(worldName);
-
-                const playerInfo = document.createElement('p');
-                playerInfo.textContent = `Players: ${instance.active_world.players}`;
-                worldCard.appendChild(playerInfo);
-
-                const instanceInfo = document.createElement('p');
-                instanceInfo.textContent = `Hosted on: ${instance.name}`;
-                worldCard.appendChild(instanceInfo);
-
-                worldCard.addEventListener('click', () => {
-                    window.open(`${instance.url}/join`, '_blank');
-                });
-
-                worldsGallery.appendChild(worldCard);
-            }
-        });
-
-        if (!activeWorldsFound) {
-            worldsGallery.innerHTML = '<p class="no-worlds">No active worlds found.</p>';
         }
     }
 
-    // Initial fetch and interval
-    if (state.isConfigured && !state.viewerLocked) {
-        fetchStatus();
-        setInterval(fetchStatus, 5000);
+    function hideModal(modal) {
+        if (modal) {
+            modal.hidden = true;
+        }
     }
-});
+
+    function postJson(url, body) {
+        return fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify(body)
+        });
+    }
+
+    function wireModals() {
+        Array.prototype.forEach.call(document.querySelectorAll(".close"), function (button) {
+            button.addEventListener("click", function () {
+                hideModal(button.closest(".modal"));
+            });
+        });
+
+        document.addEventListener("keydown", function (event) {
+            if (event.key === "Escape") {
+                Array.prototype.forEach.call(document.querySelectorAll(".modal, .overlay"), function (modal) {
+                    if (modal.id !== "viewer-lock" && !modal.hidden) {
+                        hideModal(modal);
+                    }
+                });
+            }
+        });
+
+        var initForm = document.getElementById("init-form");
+        if (initForm) {
+            initForm.addEventListener("submit", function (event) {
+                event.preventDefault();
+                var password = document.getElementById("init-password").value;
+                postJson("/api/init", { admin_password: password })
+                    .then(function (response) {
+                        if (response.ok) {
+                            window.location.reload();
+                        } else {
+                            window.alert("Initialization failed. On a hosted install it must be run on the server itself.");
+                        }
+                    })
+                    .catch(function (err) {
+                        console.error(err);
+                        window.alert("Error initializing");
+                    });
+            });
+        }
+
+        var loginForm = document.getElementById("login-form");
+        if (loginForm) {
+            loginForm.addEventListener("submit", function (event) {
+                event.preventDefault();
+                var password = document.getElementById("login-password").value;
+                var role = document.getElementById("login-role").value;
+                postJson("/api/login", { password: password, role: role })
+                    .then(function (response) {
+                        if (response.ok) {
+                            hideModal(elements.loginModal);
+                            state.isAdmin = true;
+                            if (role === "admin") {
+                                openConfigModal();
+                            }
+                        } else if (response.status === 429) {
+                            window.alert("Too many attempts. Wait a few minutes and try again.");
+                        } else {
+                            window.alert("Invalid password");
+                        }
+                    })
+                    .catch(function (err) {
+                        console.error(err);
+                        window.alert("Login error");
+                    });
+            });
+        }
+
+        var viewerForm = document.getElementById("viewer-form");
+        if (viewerForm) {
+            viewerForm.addEventListener("submit", function (event) {
+                event.preventDefault();
+                var password = document.getElementById("viewer-password").value;
+                postJson("/api/login", { password: password, role: "viewer" })
+                    .then(function (response) {
+                        if (response.ok) {
+                            window.location.reload();
+                        } else {
+                            window.alert("Invalid password");
+                        }
+                    })
+                    .catch(function (err) {
+                        console.error(err);
+                        window.alert("Login error");
+                    });
+            });
+        }
+
+        var configForm = document.getElementById("config-form");
+        if (configForm) {
+            configForm.addEventListener("submit", function (event) {
+                event.preventDefault();
+                var payload = {
+                    shared_data_mode: document.getElementById("shared-data-mode").checked,
+                    instances: instancesFromDom(),
+                    new_admin_password: document.getElementById("new-admin-password").value,
+                    new_viewer_password: document.getElementById("new-viewer-password").value
+                };
+                postJson("/api/config", payload)
+                    .then(function (response) {
+                        if (response.ok) {
+                            window.location.reload();
+                        } else {
+                            return response.json().then(function (body) {
+                                window.alert(body.error || "Failed to save configuration");
+                            });
+                        }
+                    })
+                    .catch(function (err) {
+                        console.error(err);
+                        window.alert("Error saving configuration");
+                    });
+            });
+        }
+
+        var addInstanceBtn = document.getElementById("add-instance-btn");
+        if (addInstanceBtn) {
+            addInstanceBtn.addEventListener("click", function () {
+                addInstanceRow();
+            });
+        }
+
+        if (elements.adminBtn) {
+            elements.adminBtn.addEventListener("click", function () {
+                if (state.isAdmin) {
+                    openConfigModal();
+                } else {
+                    showModal(elements.loginModal);
+                }
+            });
+        }
+    }
+
+    function addInstanceRow(data) {
+        var row = data || { name: "", url: "" };
+        var container = elements.instancesContainer;
+        var wrapper = el("div", "instance-row form-group");
+
+        var name = document.createElement("input");
+        name.type = "text";
+        name.placeholder = "Name";
+        name.className = "instance-name";
+        name.value = row.name || "";
+        name.setAttribute("aria-label", "Instance name");
+        name.required = true;
+
+        var url = document.createElement("input");
+        url.type = "url";
+        url.placeholder = "https://foundry.example.com";
+        url.className = "instance-address";
+        url.value = row.url || "";
+        url.setAttribute("aria-label", "Instance URL");
+        url.required = true;
+
+        var remove = el("button", "btn-danger remove-instance", "\u00d7");
+        remove.type = "button";
+        remove.setAttribute("aria-label", "Remove instance");
+        remove.addEventListener("click", function () {
+            wrapper.remove();
+        });
+
+        wrapper.appendChild(name);
+        wrapper.appendChild(url);
+        wrapper.appendChild(remove);
+        container.appendChild(wrapper);
+    }
+
+    function instancesFromDom() {
+        return Array.prototype.map.call(
+            document.querySelectorAll(".instance-row"),
+            function (row) {
+                return {
+                    name: row.querySelector(".instance-name").value,
+                    url: row.querySelector(".instance-address").value
+                };
+            }
+        );
+    }
+
+    function openConfigModal() {
+        fetch("/api/config", { credentials: "same-origin" })
+            .then(function (response) {
+                if (!response.ok) {
+                    state.isAdmin = false;
+                    showModal(elements.loginModal);
+                    return null;
+                }
+                return response.json();
+            })
+            .then(function (config) {
+                if (!config) {
+                    return;
+                }
+                document.getElementById("shared-data-mode").checked = Boolean(config.shared_data_mode);
+                elements.instancesContainer.textContent = "";
+                (config.instances || []).forEach(function (instance) {
+                    addInstanceRow(instance);
+                });
+                document.getElementById("new-admin-password").value = "";
+                document.getElementById("new-viewer-password").value = "";
+                showModal(elements.configModal);
+            })
+            .catch(function (err) {
+                console.error(err);
+            });
+    }
+
+    // --- Boot --------------------------------------------------------------
+
+    function boot() {
+        wireModals();
+
+        if (!state.isConfigured) {
+            showModal(elements.initModal);
+            return;
+        }
+        if (state.viewerLocked) {
+            showModal(elements.viewerLock);
+            return;
+        }
+
+        fetchStatus();
+        setInterval(fetchStatus, POLL_INTERVAL_MS);
+        setInterval(renderUpdated, 1000);
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", boot);
+    } else {
+        boot();
+    }
+})();

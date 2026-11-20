@@ -2,120 +2,111 @@
 <html lang="en">
 
 <head>
-    <!-- Meta Information -->
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
     <title>Foundry Portal</title>
 
-    <!-- Favicon -->
     <link rel="icon" href="{{ url_for('static', filename='images/foundry-portal-icon-512.png') }}" type="image/png">
 
-    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Signika:wght@400;700&display=swap" rel="stylesheet">
 
-    <!-- FontAwesome -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='fontawesome-css/all.min.css') }}">
+    <link rel="stylesheet"
+        href="{{ url_for('static', filename='css/styles.css', v=asset_version) }}">
 
-    <!-- Main CSS -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-
-    <!-- Main JavaScript with shared_data_mode -->
     <script id="main-script" data-shared-data-mode="{{ 'true' if shared_data_mode else 'false' }}"
-        src="{{ url_for('static', filename='js/main.js') }}"></script>
+        src="{{ url_for('static', filename='js/main.js', v=asset_version) }}" defer></script>
 </head>
 
 <body>
     <div class="container">
-        <!-- Header -->
         <header class="header">
             <h1>Foundry Portal</h1>
         </header>
 
-        <!-- Navigation Menu -->
-        <nav id="menu">
-            <button type="button" onclick="location.href='https://foundryvtt.com';">
-                <img class="fa-fake" src="/static/images/foundry-fa-fake.png" alt="Foundry VTT">
-            </button>
-            <button type="button" onclick="location.href='https://github.com/daxiongmao87/foundry-portal';">
-                <img class="fa-fake" src="/static/images/github-fa-fake.png" alt="GitHub Repository">
-            </button>
-            <div class="nav-separator"></div>
-            <button id="admin-btn" type="button" title="Admin Settings">
-                <i class="fas fa-cog" style="font-size: 24px; color: #e8eff7;"></i>
+        <nav id="menu" aria-label="Portal links">
+            <a class="nav-link" href="https://foundryvtt.com" aria-label="Foundry VTT website">
+                <img class="nav-icon" src="{{ url_for('static', filename='images/foundry-fa-fake.png') }}" alt="">
+            </a>
+            <a class="nav-link" href="https://github.com/daxiongmao87/foundry-portal"
+                aria-label="Foundry Portal repository">
+                <img class="nav-icon" src="{{ url_for('static', filename='images/github-fa-fake.png') }}" alt="">
+            </a>
+            <span class="nav-separator" aria-hidden="true"></span>
+            <button id="admin-btn" type="button" class="nav-link" aria-label="Admin settings">
+                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"
+                    fill="currentColor">
+                    <path
+                        d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z" />
+                </svg>
             </button>
         </nav>
 
-        <!-- Main Content -->
         <main class="main-content">
-            <!-- Active Worlds Section -->
-            <section class="panel" id="active-worlds">
-                <h2>Active Worlds</h2>
-                <div class="worlds-gallery" id="worlds-gallery">
-                    <!-- Dynamic world cards injected here -->
-                </div>
+            <section class="panel" id="active-worlds" aria-labelledby="active-worlds-title">
+                <h2 id="active-worlds-title">Active Worlds</h2>
+                <div class="worlds-gallery" id="worlds-gallery"></div>
             </section>
 
-            <!-- Instance Status Section -->
-            <section class="panel" id="instance-status">
-                <h2>Instances</h2>
+            <section class="panel" id="instance-status" aria-labelledby="instance-status-title">
+                <h2 id="instance-status-title">Instances</h2>
                 <div class="status-key">
                     <div class="status-container"><span class="status-indicator active"></span>Active</div>
                     <div class="status-container"><span class="status-indicator online"></span>Online</div>
                     <div class="status-container"><span class="status-indicator offline"></span>Offline</div>
+                    <div class="status-container"><span class="status-indicator error"></span>Error</div>
                 </div>
-                <div class="instance-list" id="instance-list">
-                    <!-- Dynamic instance cards injected here -->
-                </div>
+                <div class="instance-list" id="instance-list" aria-live="polite"></div>
+                <p class="last-updated" id="last-updated" role="status"></p>
             </section>
         </main>
 
-        <!-- Footer -->
         <footer class="footer">
             <p>Created by <a href="https://www.github.com/Daxiongmao87">Daxiongmao87</a></p>
             <p>Foundry Portal is not affiliated with Foundry Gaming LLC</p>
         </footer>
     </div>
 
-    <!-- Modals -->
-
-    <!-- Initialization Modal -->
-    <div id="init-modal" class="modal" style="display: none;">
+    <div id="init-modal" class="modal" hidden role="dialog" aria-modal="true"
+        aria-labelledby="init-title">
         <div class="modal-content">
-            <h2>Welcome to Foundry Portal</h2>
+            <h2 id="init-title">Welcome to Foundry Portal</h2>
             <p>Please set an admin password to get started.</p>
             <form id="init-form">
                 <div class="form-group">
                     <label for="init-password">Admin Password:</label>
-                    <input type="password" id="init-password" required>
+                    <input type="password" id="init-password" autocomplete="new-password" required>
                 </div>
                 <button type="submit" class="btn-primary">Set Password</button>
             </form>
         </div>
     </div>
 
-    <!-- Login Modal -->
-    <div id="login-modal" class="modal" style="display: none;">
+    <div id="login-modal" class="modal" hidden role="dialog" aria-modal="true"
+        aria-labelledby="login-title">
         <div class="modal-content">
-            <span class="close">&times;</span>
+            <button class="close" type="button" aria-label="Close login dialog">&times;</button>
             <h2 id="login-title">Admin Login</h2>
             <form id="login-form">
                 <div class="form-group">
                     <label for="login-password">Password:</label>
-                    <input type="password" id="login-password" required>
+                    <input type="password" id="login-password" autocomplete="current-password" required>
                 </div>
                 <input type="hidden" id="login-role" value="admin">
                 <button type="submit" class="btn-primary">Login</button>
-                <p class="help-text" style="margin-top: 1rem; font-size: 0.8rem; color: #888;">
-                    Forgot password? Run <code>python3 reset_password.py</code> in the server terminal.
-                </p>
+                <p class="help-text">Forgot password? Run <code>python3 reset_password.py</code> in the server
+                    terminal.</p>
             </form>
         </div>
     </div>
 
-    <!-- Config Modal -->
-    <div id="config-modal" class="modal" style="display: none;">
+    <div id="config-modal" class="modal" hidden role="dialog" aria-modal="true"
+        aria-labelledby="config-title">
         <div class="modal-content large">
-            <span class="close">&times;</span>
-            <h2>Configuration</h2>
+            <button class="close" type="button" aria-label="Close configuration dialog">&times;</button>
+            <h2 id="config-title">Configuration</h2>
 
             <form id="config-form">
                 <div class="config-section">
@@ -130,9 +121,7 @@
 
                 <div class="config-section">
                     <h3>Instances</h3>
-                    <div id="instances-container">
-                        <!-- Instance rows added here -->
-                    </div>
+                    <div id="instances-container"></div>
                     <button type="button" id="add-instance-btn" class="btn-secondary">+ Add Instance</button>
                 </div>
 
@@ -140,12 +129,13 @@
                     <h3>Security</h3>
                     <div class="form-group">
                         <label for="new-admin-password">Update Admin Password:</label>
-                        <input type="password" id="new-admin-password" placeholder="Leave blank to keep current">
+                        <input type="password" id="new-admin-password" autocomplete="new-password"
+                            placeholder="Leave blank to keep current">
                     </div>
 
                     <div class="form-group">
                         <label for="new-viewer-password">Viewer Access Password:</label>
-                        <input type="password" id="new-viewer-password"
+                        <input type="password" id="new-viewer-password" autocomplete="new-password"
                             placeholder="Leave blank to disable viewer password">
                         <p class="help-text">If set, visitors must enter this password to view the portal.</p>
                     </div>
@@ -158,27 +148,28 @@
         </div>
     </div>
 
-    <!-- Viewer Lock Overlay -->
-    <div id="viewer-lock" class="overlay" style="display: none;">
+    <div id="viewer-lock" class="overlay" hidden role="dialog" aria-modal="true"
+        aria-labelledby="viewer-title">
         <div class="modal-content">
-            <h2>Portal Locked</h2>
+            <h2 id="viewer-title">Portal Locked</h2>
             <p>Please enter the viewer password to access.</p>
             <form id="viewer-form">
                 <div class="form-group">
-                    <input type="password" id="viewer-password" required placeholder="Password">
+                    <label class="visually-hidden" for="viewer-password">Viewer password</label>
+                    <input type="password" id="viewer-password" autocomplete="current-password" required
+                        placeholder="Password">
                 </div>
                 <button type="submit" class="btn-primary">Enter</button>
             </form>
         </div>
     </div>
 
-    <script>
-        window.portalState = {
-            isConfigured: {{ 'true' if is_configured else 'false' }},
-        viewerLocked: {{ 'true' if viewer_locked else 'false' }},
-        isAdmin: {{ 'true' if is_admin else 'false' }}
-        };
-    </script>
+    <script id="portal-state" type="application/json">{{ {
+        'isConfigured': is_configured,
+        'viewerLocked': viewer_locked,
+        'isAdmin': is_admin,
+        'sharedDataMode': shared_data_mode
+    } | tojson }}</script>
 </body>
 
 </html>
